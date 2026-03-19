@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { authApi } from '../api/client';
 
 const AuthContext = createContext(null);
@@ -6,6 +6,7 @@ const AuthContext = createContext(null);
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const csrfPrimeRef = useRef(Promise.resolve());
 
   const loadUser = useCallback(async () => {
     try {
@@ -20,11 +21,12 @@ export function AuthProvider({ children }) {
 
   useEffect(() => {
     // Prime CSRF cookie for cookie-based auth flows.
-    authApi.csrf().catch(() => {});
+    csrfPrimeRef.current = authApi.csrf().catch(() => {});
     loadUser();
   }, [loadUser]);
 
   const login = async (email, password) => {
+    await csrfPrimeRef.current;
     await authApi.login({ email, password });
     const me = await authApi.me();
     setUser(me.data);
@@ -32,6 +34,7 @@ export function AuthProvider({ children }) {
   };
 
   const register = async (name, email, password, phone) => {
+    await csrfPrimeRef.current;
     await authApi.register({ name, email, password, phone });
     const me = await authApi.me();
     setUser(me.data);

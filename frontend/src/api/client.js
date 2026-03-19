@@ -6,9 +6,25 @@ function getCookie(name) {
   return m ? decodeURIComponent(m[1]) : null;
 }
 
+// Cross-domain CSRF: frontend can't always read backend cookies via `document.cookie`.
+// We store the token returned from GET /api/auth/csrf and send it in X-CSRF-Token.
+let csrfToken = null;
+
+// Jest runs without Vite's `define`, so we must guard against missing identifier.
+const RAW_API_BASE_URL =
+  (typeof __VITE_API_BASE_URL__ !== 'undefined' && __VITE_API_BASE_URL__ ? __VITE_API_BASE_URL__ : '');
+
+// Backend routes are mounted under `/api`, so normalize the baseURL accordingly.
+let normalizedBaseURL = RAW_API_BASE_URL || '/api';
+if (normalizedBaseURL !== '/api') {
+  // Remove trailing slashes.
+  normalizedBaseURL = normalizedBaseURL.replace(/\/+$/, '');
+  // Ensure it ends with `/api`.
+  if (!normalizedBaseURL.endsWith('/api')) normalizedBaseURL = `${normalizedBaseURL}/api`;
+}
+
 const api = axios.create({
-  // Jest runs without Vite's `define`, so we must guard against missing identifier.
-  baseURL: (typeof __VITE_API_BASE_URL__ !== 'undefined' && __VITE_API_BASE_URL__ ? __VITE_API_BASE_URL__ : '/api'),
+  baseURL: normalizedBaseURL,
   headers: { 'Content-Type': 'application/json' },
   withCredentials: true,
 });
@@ -17,8 +33,20 @@ const api = axios.create({
 api.interceptors.request.use(async config => {
   const method = (config.method || 'get').toLowerCase();
   if (!['get', 'head', 'options'].includes(method)) {
-    const csrf = getCookie('csrf_token');
-    if (csrf) config.headers['X-CSRF-Token'] = csrf;
+    // Prefer in-memory token primed by /auth/csrf.
+    if (csrfToken) {
+      config.headers['X-CSRF-Token'] = csrfToken;
+    } else {
+      // Fallback for same-origin / dev.
+      const fromCookie = (() => {
+        try {
+          return getCookie('csrf_token');
+        } catch {
+          return null;
+        }
+      })();
+      if (fromCookie) config.headers['X-CSRF-Token'] = fromCookie;
+    }
   }
   return config;
 });
@@ -62,7 +90,11 @@ export const authApi = {
   },
   me: () => api.get('/auth/me'),
   updateMe: d => api.put('/auth/me', d),
-  csrf: () => api.get('/auth/csrf'),
+  csrf: () =>
+    api.get('/auth/csrf').then(res => {
+      if (res?.data?.csrf_token) csrfToken = res.data.csrf_token;
+      return res;
+    }),
   logout: () => api.post('/auth/logout'),
   requestVerify: () => api.post('/auth/verify/request'),
   verifyEmail: token => api.post('/auth/verify', { token }),

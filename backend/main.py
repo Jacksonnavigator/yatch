@@ -223,10 +223,11 @@ async def csrf_middleware(request: Request, call_next):
         try:
             require_csrf(request)
         except Exception as e:
-            # If it's an HTTPException, FastAPI will handle; but middleware needs explicit response.
+            # Important: re-raise the HTTPException so standard middleware
+            # (including CORSMiddleware) can attach CORS headers.
             from fastapi import HTTPException
             if isinstance(e, HTTPException):
-                return JSONResponse(status_code=e.status_code, content={"detail": e.detail})
+                raise
             raise
     return await call_next(request)
 

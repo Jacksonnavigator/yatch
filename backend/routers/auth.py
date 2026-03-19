@@ -254,13 +254,16 @@ def get_csrf(response: Response):
     Safe to call unauthenticated.
     """
     secure = _cookie_secure()
+    token = secrets.token_urlsafe(24)
     response.set_cookie(
         key=csrf_cookie_name(),
-        value=secrets.token_urlsafe(24),
+        value=token,
         httponly=False,
         secure=secure,
         samesite="none" if secure else "lax",
         max_age=settings.REFRESH_TOKEN_EXPIRE_DAYS * 24 * 3600,
         path="/",
     )
-    return {"message": "CSRF cookie set"}
+    # Also return the token value so cross-site SPAs can send it back
+    # even when they cannot read cookies via document.cookie.
+    return {"message": "CSRF cookie set", "csrf_token": token}

@@ -13,6 +13,4 @@ alembic==1.13.1
 pydantic[email]==2.7.1
 pydantic-settings==2.2.1
 moviepy==1.0.3
-=======
 psycopg2-binary==2.9.9
->>>>>>> d0a667c73b9a58338c7d47d83e4dad6176199f29
