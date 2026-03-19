@@ -148,13 +148,12 @@ if is_dev:
 else:
     cors_origins = settings.cors_allow_origins_list or [settings.FRONTEND_URL]
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=cors_origins,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+cors_middleware_kwargs = {
+    "allow_origins": cors_origins,
+    "allow_credentials": True,
+    "allow_methods": ["*"],
+    "allow_headers": ["*"],
+}
 
 
 @app.middleware("http")
@@ -235,6 +234,10 @@ async def csrf_middleware(request: Request, call_next):
 if not is_dev:
     app.add_middleware(HTTPSRedirectMiddleware)
     app.add_middleware(TrustedHostMiddleware, allowed_hosts=settings.allowed_hosts_list or ["localhost"])
+
+# Add CORS middleware after TrustedHost so browser can still read CORS
+# headers even if the request gets rejected early.
+app.add_middleware(CORSMiddleware, **cors_middleware_kwargs)
 
 
 @app.exception_handler(Exception)
