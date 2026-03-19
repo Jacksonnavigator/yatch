@@ -34,10 +34,18 @@ def seed_database(db: Session):
     """Create owner account, yacht, pricing and default extras on first run."""
     # Owner
     if not db.query(User).filter(User.role == "owner").first():
+        # bcrypt has a hard 72-byte password limit. Enforce it to avoid
+        # startup failures when OWNER_PASSWORD is set via env.
+        owner_pw = settings.OWNER_PASSWORD or ""
+        if len(owner_pw.encode("utf-8")) > 72:
+            raise RuntimeError(
+                "OWNER_PASSWORD exceeds bcrypt 72-byte limit. "
+                "Shorten it to <=72 bytes and redeploy."
+            )
         owner = User(
             name=settings.OWNER_NAME,
             email=settings.OWNER_EMAIL,
-            hashed_password=hash_password(settings.OWNER_PASSWORD),
+            hashed_password=hash_password(owner_pw),
             role="owner",
             email_verified=True,
         )
