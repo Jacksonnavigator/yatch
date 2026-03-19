@@ -24,13 +24,14 @@ def _cookie_secure() -> bool:
 
 def _set_auth_cookies(resp: Response, access: str, refresh: str):
     secure = _cookie_secure()
+    cookie_samesite = "none" if secure else "lax"
     # access token cookie (short lived)
     resp.set_cookie(
         key="access_token",
         value=access,
         httponly=True,
         secure=secure,
-        samesite="lax",
+        samesite=cookie_samesite,
         max_age=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
         path="/",
     )
@@ -40,7 +41,7 @@ def _set_auth_cookies(resp: Response, access: str, refresh: str):
         value=refresh,
         httponly=True,
         secure=secure,
-        samesite="lax",
+        samesite=cookie_samesite,
         max_age=settings.REFRESH_TOKEN_EXPIRE_DAYS * 24 * 3600,
         path="/",
     )
@@ -50,7 +51,7 @@ def _set_auth_cookies(resp: Response, access: str, refresh: str):
         value=secrets.token_urlsafe(24),
         httponly=False,
         secure=secure,
-        samesite="lax",
+        samesite=cookie_samesite,
         max_age=settings.REFRESH_TOKEN_EXPIRE_DAYS * 24 * 3600,
         path="/",
     )
@@ -58,9 +59,10 @@ def _set_auth_cookies(resp: Response, access: str, refresh: str):
 
 def _clear_auth_cookies(resp: Response):
     secure = _cookie_secure()
-    resp.delete_cookie("access_token", path="/", secure=secure, samesite="lax")
-    resp.delete_cookie("refresh_token", path="/", secure=secure, samesite="lax")
-    resp.delete_cookie(csrf_cookie_name(), path="/", secure=secure, samesite="lax")
+    cookie_samesite = "none" if secure else "lax"
+    resp.delete_cookie("access_token", path="/", secure=secure, samesite=cookie_samesite)
+    resp.delete_cookie("refresh_token", path="/", secure=secure, samesite=cookie_samesite)
+    resp.delete_cookie(csrf_cookie_name(), path="/", secure=secure, samesite=cookie_samesite)
 
 
 class RegisterRequest(BaseModel):
@@ -257,7 +259,7 @@ def get_csrf(response: Response):
         value=secrets.token_urlsafe(24),
         httponly=False,
         secure=secure,
-        samesite="lax",
+        samesite="none" if secure else "lax",
         max_age=settings.REFRESH_TOKEN_EXPIRE_DAYS * 24 * 3600,
         path="/",
     )

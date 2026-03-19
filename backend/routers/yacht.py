@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Request
 from sqlalchemy.orm import Session
 from sqlalchemy.orm.attributes import flag_modified
 from pydantic import BaseModel
@@ -61,7 +61,14 @@ class ExtraCreate(BaseModel):
     icon: str = "⭐"
 
 
-def _yacht_dict(yacht: Yacht) -> dict:
+def _yacht_dict(yacht: Yacht, *, base_url: str | None = None) -> dict:
+    def _abs(url: str | None) -> str | None:
+        if not url:
+            return url
+        if base_url and url.startswith("/uploads/"):
+            return f"{base_url}{url}"
+        return url
+
     return {
         "id": yacht.id,
         "name": yacht.name,
@@ -73,8 +80,8 @@ def _yacht_dict(yacht: Yacht) -> dict:
         "amenities": yacht.amenities or [],
         "images": yacht.images or [],
         "videos": yacht.videos or [],
-        "featured_image": yacht.featured_image,
-        "featured_video": yacht.featured_video,
+        "featured_image": _abs(yacht.featured_image),
+        "featured_video": _abs(yacht.featured_video),
         "pricing": {
             "full_day": yacht.pricing.full_day if yacht.pricing else 3200,
             "half_day": yacht.pricing.half_day if yacht.pricing else 1800,
@@ -86,21 +93,23 @@ def _yacht_dict(yacht: Yacht) -> dict:
 
 
 @router.get("/")
-def get_yacht(db: Session = Depends(get_db)):
+def get_yacht(request: Request, db: Session = Depends(get_db)):
     yacht = db.query(Yacht).first()
     if not yacht:
         raise HTTPException(status_code=404, detail="Yacht not found")
-    return _yacht_dict(yacht)
+    base_url = str(request.base_url).rstrip("/")
+    return _yacht_dict(yacht, base_url=base_url)
 
 
 @router.put("/", dependencies=[Depends(require_owner)])
-def update_yacht(data: YachtUpdate, db: Session = Depends(get_db)):
+def update_yacht(request: Request, data: YachtUpdate, db: Session = Depends(get_db)):
     yacht = db.query(Yacht).first()
     for field, val in data.dict(exclude_none=True).items():
         setattr(yacht, field, val)
     db.commit()
     db.refresh(yacht)
-    return _yacht_dict(yacht)
+    base_url = str(request.base_url).rstrip("/")
+    return _yacht_dict(yacht, base_url=base_url)
 
 
 @router.put("/pricing", dependencies=[Depends(require_owner)])
@@ -117,7 +126,7 @@ def update_pricing(data: PricingUpdate, db: Session = Depends(get_db)):
 
 
 @router.post("/images", dependencies=[Depends(require_owner)])
-async def upload_image(file: UploadFile = File(...), db: Session = Depends(get_db)):
+async def upload_image(request: Request, file: UploadFile = File(...), db: Session = Depends(get_db)):
     if file.content_type not in settings.allowed_image_types_list:
         raise HTTPException(status_code=400, detail="Invalid file type")
     content = await file.read()
@@ -137,13 +146,14 @@ async def upload_image(file: UploadFile = File(...), db: Session = Depends(get_d
     except Exception:
         pass
     yacht = db.query(Yacht).first()
+    base_url = str(request.base_url).rstrip("/")
     images = yacht.images or []
-    images.append(f"/uploads/{filename}")
+    images.append(f"{base_url}/uploads/{filename}")
     yacht.images = images
     flag_modified(yacht, "images")
     db.commit()
     db.refresh(yacht)
-    return {"url": f"/uploads/{filename}", "images": yacht.images}
+    return {"url": f"{base_url}/uploads/{filename}", "images": yacht.images}
 
 
 @router.delete("/images/{filename}", dependencies=[Depends(require_owner)])
@@ -159,7 +169,7 @@ def delete_image(filename: str, db: Session = Depends(get_db)):
 
 
 @router.post("/videos", dependencies=[Depends(require_owner)])
-async def upload_video(file: UploadFile = File(...), db: Session = Depends(get_db)):
+async def upload_video(request: Request, file: UploadFile = File(...), db: Session = Depends(get_db)):
     allowed_video_types = {"video/mp4", "video/webm", "video/quicktime"}
     if file.content_type not in allowed_video_types:
         raise HTTPException(status_code=400, detail="Only MP4, WebM, or MOV videos allowed")
@@ -199,13 +209,14 @@ async def upload_video(file: UploadFile = File(...), db: Session = Depends(get_d
         # If probing fails, fall back to size/type validation only.
         pass
     yacht = db.query(Yacht).first()
+    base_url = str(request.base_url).rstrip("/")
     videos = yacht.videos or []
-    videos.append(f"/uploads/{filename}")
+    videos.append(f"{base_url}/uploads/{filename}")
     yacht.videos = videos
     flag_modified(yacht, "videos")
     db.commit()
     db.refresh(yacht)
-    return {"url": f"/uploads/{filename}", "videos": yacht.videos}
+    return {"url": f"{base_url}/uploads/{filename}", "videos": yacht.videos}
 
 
 @router.delete("/videos/{filename}", dependencies=[Depends(require_owner)])
