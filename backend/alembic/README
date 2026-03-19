@@ -1,0 +1,8 @@
+Alembic migrations directory.
+
+Initial setup is wired to the application's SQLAlchemy Base metadata.
+To create a new migration from model changes, run (from backend/):
+
+  alembic revision --autogenerate -m "description"
+  alembic upgrade head
+
