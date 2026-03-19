@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import { AuthProvider } from './context/AuthContext';
 import { YachtProvider } from './context/YachtContext';
@@ -23,7 +23,7 @@ export default function App() {
   return (
     <AuthProvider>
       <YachtProvider>
-        <BrowserRouter>
+        <HashRouter>
           <Navbar />
           <ErrorBoundary>
             <Routes>
@@ -66,7 +66,7 @@ export default function App() {
               error: { iconTheme: { primary: '#c0392b', secondary: '#0d1424' } },
             }}
           />
-        </BrowserRouter>
+        </HashRouter>
       </YachtProvider>
     </AuthProvider>
   );

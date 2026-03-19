@@ -7,7 +7,8 @@ function getCookie(name) {
 }
 
 const api = axios.create({
-  baseURL: (import.meta.env.VITE_API_BASE_URL || '/api'),
+  // Jest runs without Vite's `define`, so we must guard against missing identifier.
+  baseURL: (typeof __VITE_API_BASE_URL__ !== 'undefined' && __VITE_API_BASE_URL__ ? __VITE_API_BASE_URL__ : '/api'),
   headers: { 'Content-Type': 'application/json' },
   withCredentials: true,
 });
