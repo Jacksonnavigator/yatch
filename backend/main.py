@@ -148,13 +148,12 @@ if is_dev:
 else:
     cors_origins = settings.cors_allow_origins_list or [settings.FRONTEND_URL]
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=cors_origins,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+cors_middleware_kwargs = {
+    "allow_origins": cors_origins,
+    "allow_credentials": True,
+    "allow_methods": ["*"],
+    "allow_headers": ["*"],
+}
 
 
 @app.middleware("http")
@@ -192,6 +191,9 @@ async def request_id_and_metrics_middleware(request: Request, call_next):
 @app.middleware("http")
 async def security_headers_middleware(request: Request, call_next):
     resp = await call_next(request)
+    # Remove WWW-Authenticate from 401 so the browser won't show its native auth popup.
+    if resp.status_code == 401:
+        resp.headers.pop("www-authenticate", None)
     resp.headers.setdefault("X-Content-Type-Options", "nosniff")
     resp.headers.setdefault("Referrer-Policy", "no-referrer")
     resp.headers.setdefault("X-Frame-Options", "DENY")
@@ -234,7 +236,15 @@ async def csrf_middleware(request: Request, call_next):
 # HTTPS redirect (production)
 if not is_dev:
     app.add_middleware(HTTPSRedirectMiddleware)
-    app.add_middleware(TrustedHostMiddleware, allowed_hosts=settings.allowed_hosts_list or ["localhost"])
+    # TrustedHost can cause early rejections (before CORS headers are set)
+    # if the Render hostnames don't exactly match our ALLOWED_HOSTS setting.
+    # Only enable it when ALLOWED_HOSTS is explicitly provided in the environment.
+    if os.getenv("ALLOWED_HOSTS"):
+        app.add_middleware(TrustedHostMiddleware, allowed_hosts=settings.allowed_hosts_list)
+
+# Add CORS middleware after TrustedHost so browser can still read CORS
+# headers even if the request gets rejected early.
+app.add_middleware(CORSMiddleware, **cors_middleware_kwargs)
 
 
 @app.exception_handler(Exception)

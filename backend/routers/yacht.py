@@ -69,6 +69,11 @@ def _yacht_dict(yacht: Yacht, *, base_url: str | None = None) -> dict:
             return f"{base_url}{url}"
         return url
 
+    # Convert relative /uploads/... URLs to absolute so images load when
+    # frontend and backend are on different domains (e.g. Render static vs API).
+    _images = [(u and _abs(u)) or u for u in (yacht.images or [])]
+    _videos = [(u and _abs(u)) or u for u in (yacht.videos or [])]
+
     return {
         "id": yacht.id,
         "name": yacht.name,
@@ -78,8 +83,8 @@ def _yacht_dict(yacht: Yacht, *, base_url: str | None = None) -> dict:
         "description": yacht.description,
         "location": yacht.location,
         "amenities": yacht.amenities or [],
-        "images": yacht.images or [],
-        "videos": yacht.videos or [],
+        "images": _images,
+        "videos": _videos,
         "featured_image": _abs(yacht.featured_image),
         "featured_video": _abs(yacht.featured_video),
         "pricing": {
