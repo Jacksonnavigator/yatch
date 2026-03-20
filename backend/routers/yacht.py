@@ -1,9 +1,9 @@
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Request
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query, Request
 from sqlalchemy.orm import Session
 from sqlalchemy.orm.attributes import flag_modified
 from pydantic import BaseModel
 from typing import List, Optional
-import os, uuid, aiofiles
+import io, os, uuid, aiofiles
 from PIL import Image as PILImage
 from core.database import get_db
 from core.security import get_current_user, require_owner
@@ -130,6 +130,22 @@ def update_pricing(data: PricingUpdate, db: Session = Depends(get_db)):
     return {"message": "Pricing updated", **data.dict()}
 
 
+def _upload_to_cloudinary(content: bytes, public_id: str, resource_type: str = "image") -> str:
+    """Upload to Cloudinary. Returns secure_url. Requires CLOUDINARY_URL env."""
+    import cloudinary.uploader
+    cld_url = get_settings().CLOUDINARY_URL
+    if not cld_url:
+        raise RuntimeError("CLOUDINARY_URL not set")
+    os.environ["CLOUDINARY_URL"] = cld_url
+    result = cloudinary.uploader.upload(
+        io.BytesIO(content),
+        public_id=public_id,
+        resource_type=resource_type,
+        overwrite=True,
+    )
+    return result["secure_url"]
+
+
 @router.post("/images", dependencies=[Depends(require_owner)])
 async def upload_image(request: Request, file: UploadFile = File(...), db: Session = Depends(get_db)):
     if file.content_type not in settings.allowed_image_types_list:
@@ -137,37 +153,95 @@ async def upload_image(request: Request, file: UploadFile = File(...), db: Sessi
     content = await file.read()
     if len(content) > settings.MAX_FILE_SIZE_MB * 1024 * 1024:
         raise HTTPException(status_code=400, detail=f"File too large (max {settings.MAX_FILE_SIZE_MB}MB)")
-    os.makedirs(settings.UPLOAD_DIR, exist_ok=True)
-    ext = file.filename.rsplit(".", 1)[-1].lower()
-    filename = f"{uuid.uuid4()}.{ext}"
-    path = os.path.join(settings.UPLOAD_DIR, filename)
-    async with aiofiles.open(path, "wb") as f:
-        await f.write(content)
-    # Resize & optimize
-    try:
-        img = PILImage.open(path)
-        img.thumbnail((1920, 1080))
-        img.save(path, optimize=True, quality=85)
-    except Exception:
-        pass
     yacht = db.query(Yacht).first()
     base_url = str(request.base_url).rstrip("/")
+
+    if settings.CLOUDINARY_URL:
+        # Use Cloudinary (persists on free tier, no disk needed on Render)
+        public_id = f"yacht/{uuid.uuid4()}"
+        try:
+            # Resize before upload to save bandwidth
+            try:
+                img = PILImage.open(io.BytesIO(content))
+                img.thumbnail((1920, 1080))
+                buf = io.BytesIO()
+                img.save(buf, format=img.format or "JPEG", optimize=True, quality=85)
+                content = buf.getvalue()
+            except Exception:
+                pass
+            url = _upload_to_cloudinary(content, public_id)
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Cloudinary upload failed: {e}")
+    else:
+        # Local disk (dev)
+        os.makedirs(settings.UPLOAD_DIR, exist_ok=True)
+        ext = file.filename.rsplit(".", 1)[-1].lower()
+        filename = f"{uuid.uuid4()}.{ext}"
+        path = os.path.join(settings.UPLOAD_DIR, filename)
+        async with aiofiles.open(path, "wb") as f:
+            await f.write(content)
+        try:
+            img = PILImage.open(path)
+            img.thumbnail((1920, 1080))
+            img.save(path, optimize=True, quality=85)
+        except Exception:
+            pass
+        url = f"{base_url}/uploads/{filename}"
+
     images = yacht.images or []
-    images.append(f"{base_url}/uploads/{filename}")
+    images.append(url)
     yacht.images = images
     flag_modified(yacht, "images")
     db.commit()
     db.refresh(yacht)
-    return {"url": f"{base_url}/uploads/{filename}", "images": yacht.images}
+    return {"url": url, "images": yacht.images}
 
 
-@router.delete("/images/{filename}", dependencies=[Depends(require_owner)])
-def delete_image(filename: str, db: Session = Depends(get_db)):
+def _cloudinary_public_id_from_url(url: str) -> str | None:
+    """Extract public_id from Cloudinary URL for destroy(). Returns None if not a Cloudinary URL."""
+    if "cloudinary.com" not in url:
+        return None
+    # Format: .../upload/v123/folder/name.jpg or .../upload/folder/name.jpg
+    import re
+    m = re.search(r"/upload/(?:[^/]+/)*v\d+/(.+)$", url) or re.search(r"/upload/(.+)$", url)
+    if not m:
+        return None
+    raw = m.group(1)
+    # Remove file extension (Cloudinary public_id has no extension)
+    if "." in raw:
+        raw = raw.rsplit(".", 1)[0]
+    return raw
+
+
+@router.delete("/images", dependencies=[Depends(require_owner)])
+def delete_image(url: str = Query(..., description="Full image URL to delete"), db: Session = Depends(get_db)):
+    """Delete image by URL. Handles Cloudinary and local /uploads/ files."""
     yacht = db.query(Yacht).first()
-    path = os.path.join(settings.UPLOAD_DIR, filename)
-    if os.path.exists(path):
-        os.remove(path)
-    yacht.images = [i for i in (yacht.images or []) if filename not in i]
+    images = yacht.images or []
+
+    if "cloudinary.com" in url:
+        # Delete from Cloudinary
+        public_id = _cloudinary_public_id_from_url(url)
+        if public_id:
+            try:
+                import os as _os
+                _cld = get_settings().CLOUDINARY_URL
+                if _cld:
+                    _os.environ["CLOUDINARY_URL"] = _cld
+                    import cloudinary.uploader
+                    cloudinary.uploader.destroy(public_id)
+            except Exception:
+                pass  # Still remove from DB
+    else:
+        # Local file: extract filename from .../uploads/filename
+        filename = url.split("/uploads/")[-1].split("?")[0] if "/uploads/" in url else None
+        if filename:
+            path = os.path.join(settings.UPLOAD_DIR, filename)
+            if os.path.exists(path):
+                os.remove(path)
+
+    images = [i for i in images if i != url]
+    yacht.images = images
     flag_modified(yacht, "images")
     db.commit()
     return {"message": "Image deleted"}

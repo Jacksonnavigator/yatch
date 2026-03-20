@@ -154,9 +154,8 @@ export default function OwnerYacht() {
   };
 
   const deleteImage = async (url) => {
-    const filename = url.split('/').pop();
     try {
-      await yachtApi.deleteImage(filename);
+      await yachtApi.deleteImage(url);
       toast.success('Image removed');
       await refreshYacht();
     } catch { toast.error('Delete failed'); }

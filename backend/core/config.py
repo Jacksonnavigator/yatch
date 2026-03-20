@@ -40,6 +40,9 @@ class Settings(BaseSettings):
     UPLOAD_DIR: str = "uploads"
     MAX_FILE_SIZE_MB: int = 10
     ALLOWED_IMAGE_TYPES: str = "image/jpeg,image/png,image/webp"
+    # Cloudinary (optional). If set, images are stored here instead of local disk.
+    # Free tier: https://cloudinary.com - no credit card. Set CLOUDINARY_URL from Dashboard.
+    CLOUDINARY_URL: str = ""
 
     # Rate limiting
     RATE_LIMIT_PER_MINUTE: int = 60

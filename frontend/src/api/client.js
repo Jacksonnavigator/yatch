@@ -119,7 +119,7 @@ export const yachtApi = {
       return res;
     });
   },
-  deleteImage: filename => api.delete(`/yacht/images/${filename}`),
+  deleteImage: url => api.delete('/yacht/images', { params: { url } }),
   uploadVideo: file => {
     const fd = new FormData(); fd.append('file', file);
     return api.post('/yacht/videos', fd, { headers: { 'Content-Type': 'multipart/form-data' } }).then(res => {
