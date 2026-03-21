@@ -51,7 +51,10 @@ api.interceptors.request.use(async config => {
   return config;
 });
 
-// Auto-refresh on 401
+// Auto-refresh on 401 — attempt a silent token refresh, then retry once.
+// _retry flag on both the original AND the refresh call prevents infinite loops:
+// if refresh itself returns 401 (no valid cookie / user not logged in), we stop
+// immediately instead of calling refresh again.
 api.interceptors.response.use(
   res => res,
   async err => {
@@ -59,11 +62,16 @@ api.interceptors.response.use(
     if (err.response?.status === 401 && !original._retry) {
       original._retry = true;
       try {
-        // Refresh uses httpOnly cookie; no JS token storage.
-        await api.post('/auth/refresh', null, { withCredentials: true });
+        // Mark refresh as _retry so a 401 on it doesn't re-enter this block.
+        await api.post('/auth/refresh', null, { withCredentials: true, _retry: true });
         return api(original);
       } catch {
-        window.location.href = '/login';
+        // Refresh failed — user simply isn't authenticated.
+        // Only redirect to /login if they were trying to reach a protected page
+        // (i.e. not background calls like /auth/me on public pages).
+        if (original._redirectOn401) {
+          window.location.href = '/#/login';
+        }
       }
     }
     // Centralized error toast (can be disabled per-request with _suppressErrorToast)
@@ -141,8 +149,8 @@ export const yachtApi = {
 
 // ── Bookings ──────────────────────────────────────────────────────────────
 export const bookingApi = {
-  create: (d, config) => api.post('/bookings/', d, config),
-  myBookings: () => api.get('/bookings/my'),
+  create: (d, config) => api.post('/bookings/', d, { _redirectOn401: true, ...config }),
+  myBookings: () => api.get('/bookings/my', { _redirectOn401: true }),
   list: (status) => api.get('/bookings/', { params: status ? { status } : {} }),
   get: id => api.get(`/bookings/${id}`),
   updateStatus: (id, d) => api.put(`/bookings/${id}/status`, d),
