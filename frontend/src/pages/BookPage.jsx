@@ -69,7 +69,7 @@ export default function BookPage() {
         hourly_hours: form.charter_type === 'hourly' ? (form.hourly_hours || 4) : undefined,
         end_date: form.charter_type === 'multi_day' ? (rangeEnd || null) : null,
       };
-      const { data } = await bookingApi.create(payload);
+      const { data } = await bookingApi.create(payload, { _suppressErrorToast: true });
       setConfirmed(data);
       setStep(5);
       toast.success('Booking submitted!');

@@ -141,7 +141,7 @@ export const yachtApi = {
 
 // ── Bookings ──────────────────────────────────────────────────────────────
 export const bookingApi = {
-  create: d => api.post('/bookings/', d),
+  create: (d, config) => api.post('/bookings/', d, config),
   myBookings: () => api.get('/bookings/my'),
   list: (status) => api.get('/bookings/', { params: status ? { status } : {} }),
   get: id => api.get(`/bookings/${id}`),

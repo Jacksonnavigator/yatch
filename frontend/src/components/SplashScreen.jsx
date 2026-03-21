@@ -55,7 +55,7 @@ export default function SplashScreen({ isVisible, onExit }) {
         .splash-logo {
           max-width: min(280px, 70vw);
           height: auto;
-          filter: drop-shadow(0 4px 24px rgba(0,0,0,0.4));
+          mix-blend-mode: multiply;
           animation: splash-logo-enter 1s ease-out forwards;
         }
         .splash-wave {
