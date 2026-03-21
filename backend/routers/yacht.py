@@ -240,6 +240,9 @@ def delete_image(url: str = Query(..., description="Full image URL to delete"), 
             if os.path.exists(path):
                 os.remove(path)
 
+    # If featured image is the one being deleted, clear it too.
+    if yacht.featured_image == url:
+        yacht.featured_image = None
     images = [i for i in images if i != url]
     yacht.images = images
     flag_modified(yacht, "images")
