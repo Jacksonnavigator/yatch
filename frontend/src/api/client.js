@@ -63,7 +63,8 @@ api.interceptors.response.use(
       original._retry = true;
       try {
         // Mark refresh as _retry so a 401 on it doesn't re-enter this block.
-        await api.post('/auth/refresh', null, { withCredentials: true, _retry: true });
+        // Suppress toast — a failed refresh just means the user isn't logged in.
+        await api.post('/auth/refresh', null, { withCredentials: true, _retry: true, _suppressErrorToast: true });
         return api(original);
       } catch {
         // Refresh failed — user simply isn't authenticated.
