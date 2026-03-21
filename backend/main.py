@@ -220,17 +220,38 @@ async def security_headers_middleware(request: Request, call_next):
 @app.middleware("http")
 async def csrf_middleware(request: Request, call_next):
     # Enforce CSRF for cookie-authenticated unsafe requests.
-    # Skip FastAPI docs and static.
-    if request.url.path.startswith("/api") and not request.url.path.startswith("/api/docs") and not request.url.path.startswith("/api/redoc"):
+    # Skip docs, static, and auth endpoints that can't carry a CSRF token
+    # (e.g. /refresh is called by the 401 interceptor before CSRF is primed).
+    _csrf_exempt = {
+        "/api/auth/csrf",
+        "/api/auth/login",
+        "/api/auth/refresh",
+        "/api/auth/logout",
+        "/api/auth/register",
+        "/api/auth/verify",
+        "/api/auth/verify/request",
+        "/api/auth/forgot-password",
+        "/api/auth/reset-password",
+    }
+    path = request.url.path
+    if (
+        path.startswith("/api")
+        and path not in _csrf_exempt
+        and not path.startswith("/api/docs")
+        and not path.startswith("/api/redoc")
+    ):
         try:
             require_csrf(request)
         except Exception as e:
-            # Important: re-raise the HTTPException so standard middleware
-            # (including CORSMiddleware) can attach CORS headers.
-            from fastapi import HTTPException
-            if isinstance(e, HTTPException):
-                raise
-            raise
+            from fastapi import HTTPException as _HTTPEx
+            # Return a JSONResponse instead of raising so Starlette's TaskGroup
+            # doesn't turn this into an ExceptionGroup crash.
+            if isinstance(e, _HTTPEx):
+                return JSONResponse(
+                    status_code=e.status_code,
+                    content={"detail": e.detail},
+                )
+            return JSONResponse(status_code=403, content={"detail": "CSRF check failed"})
     return await call_next(request)
 
 # HTTPS redirect (production)
