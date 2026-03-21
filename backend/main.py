@@ -192,8 +192,8 @@ async def request_id_and_metrics_middleware(request: Request, call_next):
 async def security_headers_middleware(request: Request, call_next):
     resp = await call_next(request)
     # Remove WWW-Authenticate from 401 so the browser won't show its native auth popup.
-    if resp.status_code == 401:
-        resp.headers.pop("www-authenticate", None)
+    if resp.status_code == 401 and "www-authenticate" in resp.headers:
+        del resp.headers["www-authenticate"]
     resp.headers.setdefault("X-Content-Type-Options", "nosniff")
     resp.headers.setdefault("Referrer-Policy", "no-referrer")
     resp.headers.setdefault("X-Frame-Options", "DENY")

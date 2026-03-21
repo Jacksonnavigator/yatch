@@ -7,6 +7,7 @@ export default function YachtPage() {
   const [yacht, setYacht] = useState(null);
   const [extras, setExtras] = useState([]);
   const [lightbox, setLightbox] = useState(null);
+  const [videoModal, setVideoModal] = useState(null);
 
   useEffect(() => {
     setYacht(globalYacht);
@@ -64,6 +65,13 @@ export default function YachtPage() {
         .lightbox { position: fixed; inset: 0; z-index: 1000; background: rgba(6,11,22,0.95); display: flex; align-items: center; justify-content: center; cursor: pointer; }
         .lightbox img { max-width: 90vw; max-height: 90vh; object-fit: contain; border: 1px solid var(--border); }
         .lightbox-close { position: absolute; top: 24px; right: 32px; font-size: 28px; color: var(--muted); background: none; border: none; cursor: pointer; }
+        .gal-vid-wrap { break-inside: avoid; margin-bottom: 12px; border: 1px solid var(--border); overflow: hidden; cursor: pointer; position: relative; }
+        .gal-vid-wrap video { width: 100%; display: block; }
+        .gal-vid-play { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.4); opacity: 0; transition: opacity .3s; }
+        .gal-vid-wrap:hover .gal-vid-play { opacity: 1; }
+        .video-modal { position: fixed; inset: 0; z-index: 1000; background: rgba(6,11,22,0.95); display: flex; align-items: center; justify-content: center; cursor: pointer; }
+        .video-modal video { max-width: 90vw; max-height: 90vh; border: 1px solid var(--border); }
+        .video-modal-close { position: absolute; top: 24px; right: 32px; font-size: 28px; color: var(--muted); background: none; border: none; cursor: pointer; }
 
         .cta-strip { background: linear-gradient(135deg, rgba(201,168,76,.08), transparent); border: 1px solid var(--border); padding: 48px; text-align: center; }
         .cta-strip h2 { font-family:'Cormorant Garamond',serif; font-size: 36px; font-weight: 300; margin-bottom: 12px; }
@@ -151,14 +159,20 @@ export default function YachtPage() {
         )}
 
         {/* Gallery */}
-        {yacht?.images?.length > 0 && (
+        {(yacht?.images?.length > 0 || yacht?.videos?.length > 0) && (
           <div className="yp-section">
             <div className="yp-section-label">Gallery</div>
             <h2>Life on <em>the water</em></h2>
             <div className="gallery-masonry">
-              {yacht.images.map((img, i) => (
-                <div key={i} className="gal-img-wrap" onClick={() => setLightbox(img)}>
+              {yacht?.images?.map((img, i) => (
+                <div key={`img-${i}`} className="gal-img-wrap" onClick={() => setLightbox(img)}>
                   <img src={img} alt={`Rock The Yatch ${i + 1}`} />
+                </div>
+              ))}
+              {yacht?.videos?.filter(v => v !== yacht?.featured_video).map((vid, i) => (
+                <div key={`vid-${i}`} className="gal-vid-wrap" onClick={() => setVideoModal(vid)}>
+                  <video src={vid} preload="metadata" />
+                  <div className="gal-vid-play"><span style={{ fontSize: 48 }}>▶️</span></div>
                 </div>
               ))}
             </div>
@@ -173,11 +187,19 @@ export default function YachtPage() {
         </div>
       </div>
 
-      {/* Lightbox */}
+      {/* Image lightbox */}
       {lightbox && (
         <div className="lightbox" onClick={() => setLightbox(null)}>
-          <button className="lightbox-close">✕</button>
+          <button type="button" className="lightbox-close" onClick={() => setLightbox(null)} aria-label="Close">✕</button>
           <img src={lightbox} alt="Gallery" onClick={e => e.stopPropagation()} />
+        </div>
+      )}
+
+      {/* Video modal */}
+      {videoModal && (
+        <div className="video-modal" onClick={() => setVideoModal(null)}>
+          <button type="button" className="video-modal-close" onClick={() => setVideoModal(null)} aria-label="Close">✕</button>
+          <video src={videoModal} controls autoPlay onClick={e => e.stopPropagation()} />
         </div>
       )}
     </>

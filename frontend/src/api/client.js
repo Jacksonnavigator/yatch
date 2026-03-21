@@ -60,7 +60,7 @@ api.interceptors.response.use(
       original._retry = true;
       try {
         // Refresh uses httpOnly cookie; no JS token storage.
-        await axios.post('/api/auth/refresh', null, { withCredentials: true });
+        await api.post('/auth/refresh', null, { withCredentials: true });
         return api(original);
       } catch {
         window.location.href = '/login';
@@ -88,7 +88,7 @@ export const authApi = {
     form.append('password', d.password);
     return api.post('/auth/login', form, { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } });
   },
-  me: () => api.get('/auth/me'),
+  me: () => api.get('/auth/me', { _suppressErrorToast: true }),
   updateMe: d => api.put('/auth/me', d),
   csrf: () =>
     api.get('/auth/csrf').then(res => {

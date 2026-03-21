@@ -4,6 +4,8 @@ import { useYacht } from '../context/YachtContext';
 
 export default function Home() {
   const { yacht, loading } = useYacht();
+  const [lightbox, setLightbox] = useState(null);
+  const [videoModal, setVideoModal] = useState(null);
 
   return (
     <>
@@ -35,10 +37,16 @@ export default function Home() {
         .gallery-item { aspect-ratio: 4/3; overflow: hidden; border: 1px solid var(--border); cursor: pointer; position: relative; }
         .gallery-item img, .gallery-item video { width: 100%; height: 100%; object-fit: cover; transition: transform .4s; }
         .gallery-item:hover img, .gallery-item:hover video { transform: scale(1.05); }
-        .gallery-play { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.4); opacity: 0; transition: opacity .3s; }
+        .gallery-play { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.4); opacity: 0; transition: opacity .3s; cursor: pointer; }
         .gallery-item:hover .gallery-play { opacity: 1; }
         .gallery-play-icon { font-size: 48px; }
         .gallery-empty { background: var(--glass); display: flex; align-items: center; justify-content: center; font-size: 11px; letter-spacing: 2px; color: var(--muted); text-transform: uppercase; }
+        .gallery-lightbox { position: fixed; inset: 0; z-index: 1000; background: rgba(6,11,22,0.95); display: flex; align-items: center; justify-content: center; cursor: pointer; }
+        .gallery-lightbox img { max-width: 90vw; max-height: 90vh; object-fit: contain; border: 1px solid var(--border); }
+        .gallery-lightbox-close { position: absolute; top: 24px; right: 32px; font-size: 28px; color: var(--muted); background: none; border: none; cursor: pointer; z-index: 2; }
+        .gallery-video-modal { position: fixed; inset: 0; z-index: 1000; background: rgba(6,11,22,0.95); display: flex; align-items: center; justify-content: center; cursor: pointer; }
+        .gallery-video-modal video { max-width: 90vw; max-height: 90vh; border: 1px solid var(--border); }
+        .gallery-video-modal-close { position: absolute; top: 24px; right: 32px; font-size: 28px; color: var(--muted); background: none; border: none; cursor: pointer; z-index: 2; }
 
         .about { padding: 100px 40px; max-width: 1200px; margin: 0 auto; display: grid; grid-template-columns: 1fr 1fr; gap: 80px; align-items: center; }
         @media(max-width:768px) { .about { grid-template-columns: 1fr; padding: 60px 20px; gap: 40px; } }
@@ -190,21 +198,37 @@ export default function Home() {
           <div className="gallery-grid">
             {/* Images - exclude featured */}
             {yacht?.images?.filter(img => img !== yacht.featured_image).map((img, i) => (
-              <div key={`img-${i}`} className="gallery-item">
+              <div key={`img-${i}`} className="gallery-item" onClick={() => setLightbox(img)}>
                 <img src={img} alt={`Rock The Yatch Image ${i + 1}`} />
               </div>
             ))}
             {/* Videos - exclude featured */}
             {yacht?.videos?.filter(vid => vid !== yacht.featured_video).map((vid, i) => (
-              <div key={`vid-${i}`} className="gallery-item">
+              <div key={`vid-${i}`} className="gallery-item" onClick={() => setVideoModal(vid)}>
                 <video src={vid} preload="metadata" />
-                <div className="gallery-play">
+                <div className="gallery-play" onClick={e => { e.stopPropagation(); setVideoModal(vid); }}>
                   <div className="gallery-play-icon">▶️</div>
                 </div>
               </div>
             ))}
           </div>
         </section>
+      )}
+
+      {/* Image lightbox */}
+      {lightbox && (
+        <div className="gallery-lightbox" onClick={() => setLightbox(null)}>
+          <button type="button" className="gallery-lightbox-close" onClick={() => setLightbox(null)} aria-label="Close">✕</button>
+          <img src={lightbox} alt="Gallery" onClick={e => e.stopPropagation()} />
+        </div>
+      )}
+
+      {/* Video modal */}
+      {videoModal && (
+        <div className="gallery-video-modal" onClick={() => { setVideoModal(null); }}>
+          <button type="button" className="gallery-video-modal-close" onClick={() => setVideoModal(null)} aria-label="Close">✕</button>
+          <video src={videoModal} controls autoPlay onClick={e => e.stopPropagation()} />
+        </div>
       )}
 
       {/* CTA */}

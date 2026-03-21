@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import { AuthProvider } from './context/AuthContext';
@@ -5,6 +6,7 @@ import { YachtProvider } from './context/YachtContext';
 import { ProtectedRoute, OwnerRoute } from './components/ProtectedRoute';
 import ErrorBoundary from './components/ErrorBoundary';
 import Navbar from './components/Navbar';
+import SplashScreen from './components/SplashScreen';
 import Home from './pages/Home';
 import YachtPage from './pages/YachtPage';
 import ProfilePage from './pages/ProfilePage';
@@ -20,9 +22,15 @@ import OwnerCalendar from './pages/OwnerCalendar';
 import OwnerYacht from './pages/OwnerYacht';
 
 export default function App() {
+  const [showSplash, setShowSplash] = useState(true);
+
   return (
     <AuthProvider>
       <YachtProvider>
+        <SplashScreen
+          isVisible={showSplash}
+          onExit={() => setShowSplash(false)}
+        />
         <HashRouter>
           <Navbar />
           <ErrorBoundary>
